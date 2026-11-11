@@ -34,7 +34,9 @@ jobs:
       run: 'mkdir -p studio
 
         printf ''%s\n'' ''{"private":true,"packageManager":"pnpm@11.7.0","devDependencies":{"@playwright/test":"1.62.1","better-sqlite3":"13.0.3"}}''
-        > studio/package.json'
+        > studio/package.json
+
+        printf ''allowBuilds:\n  better-sqlite3: true\n'' > studio/pnpm-workspace.yaml'
     - name: Set up pnpm
       uses: pnpm/action-setup@v4
       with:
@@ -42,7 +44,10 @@ jobs:
         run_install: false
     - name: Install test dependencies
       working-directory: studio
-      run: pnpm install --config.allowBuilds.better-sqlite3=true
+      run: 'pnpm install --no-frozen-lockfile
+
+        node -e ''const Database=require("better-sqlite3");const db=new Database(":memory:");console.log(db.prepare("select
+        1 as ok").get());db.close();'''
     - name: Verify Chromium
       timeout-minutes: 2
       working-directory: studio
