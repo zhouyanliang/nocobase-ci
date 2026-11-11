@@ -8,20 +8,11 @@ permissions:
 jobs:
   browser:
     runs-on: ubuntu-24.04
-    container:
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
-      options: --init --ipc=host
     defaults:
       run:
         shell: bash
     timeout-minutes: 15
     steps:
-    - name: Prepare CI tools
-      timeout-minutes: 2
-      run: "curl --fail --silent --show-error --location --retry 3 --connect-timeout\
-        \ 10 --max-time 30 \\\n  https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64\
-        \ -o /tmp/jq\necho '020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d\
-        \  /tmp/jq' | sha256sum --check\ninstall -m 755 /tmp/jq /usr/local/bin/jq\n"
     - uses: actions/checkout@v4
       with:
         persist-credentials: false
@@ -47,16 +38,21 @@ jobs:
       run: 'pnpm install --no-frozen-lockfile
 
         node -e ''const Database=require("better-sqlite3");const db=new Database(":memory:");console.log(db.prepare("select
+        1 as ok").get());db.close();''
+
+        ../.github/nocobase3/run-studio-browser.sh "$PWD" pnpm exec node -e ''const
+        Database=require("better-sqlite3");const db=new Database(":memory:");console.log(db.prepare("select
         1 as ok").get());db.close();'''
     - name: Verify Chromium
-      timeout-minutes: 2
+      timeout-minutes: 5
       working-directory: studio
-      run: "pnpm exec node --input-type=module <<'NODE'\nimport { chromium } from\
-        \ '@playwright/test';\nconst browser = await chromium.launch();\ntry {\n \
-        \ const page = await browser.newPage();\n  await page.setContent('<title>Studio\
-        \ browser check</title>');\n  if (await page.title() !== 'Studio browser check')\
-        \ throw new Error('Chromium check failed');\n  console.log(`Chromium ${browser.version()}\
-        \ is ready`);\n} finally {\n  await browser.close();\n}\nNODE\n"
+      run: "../.github/nocobase3/run-studio-browser.sh \"$PWD\" node --input-type=module\
+        \ <<'NODE'\nimport { chromium } from '@playwright/test';\nconst browser =\
+        \ await chromium.launch();\ntry {\n  const page = await browser.newPage();\n\
+        \  await page.setContent('<title>Studio browser check</title>');\n  if (await\
+        \ page.title() !== 'Studio browser check') throw new Error('Chromium check\
+        \ failed');\n  console.log(`Chromium ${browser.version()} is ready`);\n} finally\
+        \ {\n  await browser.close();\n}\nNODE\n"
     - name: Verify runner tools and workflow contracts
       run: 'node --version
 

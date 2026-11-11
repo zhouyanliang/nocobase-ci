@@ -278,14 +278,8 @@ jobs:
   e2e:
     name: Studio e2e
     if: ${{ inputs.event_name == 'pull_request' }}
+    # Match the Noble browser container, including native modules built on the host.
     runs-on: ubuntu-24.04
-    container:
-      # Keep both build jobs on the same OS and update this with Studio's locked Playwright version.
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
-      options: --init --ipc=host
-    defaults:
-      run:
-        shell: bash
     permissions:
       contents: read
       id-token: write
@@ -300,16 +294,6 @@ jobs:
       framework-key: ${{ steps.framework-build.outputs.key }}
       framework-cached: ${{ steps.framework-cache.outputs.cache-hit }}
     steps:
-      # The source-token helper needs jq; the browser image does not include it. Use the verified standalone binary,
-      # without apt: the browser and all system dependencies are already in the image.
-      - name: Prepare CI tools
-        timeout-minutes: 2
-        run: |
-          curl --fail --silent --show-error --location --retry 3 --connect-timeout 10 --max-time 30 \
-            https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64 -o /tmp/jq
-          echo '020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d  /tmp/jq' | sha256sum --check
-          install -m 755 /tmp/jq /usr/local/bin/jq
-
       - name: Check out trusted CI helpers
         uses: actions/checkout@v4
         with:
@@ -371,12 +355,12 @@ jobs:
           INSTALL_FLAG: ${{ steps.framework.outputs.install-flag }}
         run: pnpm install "$INSTALL_FLAG"
 
-      # Fail before the application build if its Playwright version needs another browser image.
+      # The image is selected from the installed Playwright package; no apt or browser download during the job.
       - name: Verify Chromium
-        timeout-minutes: 2
+        timeout-minutes: 5
         working-directory: studio
         run: |
-          pnpm exec node --input-type=module <<'NODE'
+          ../.github/nocobase3/run-studio-browser.sh "$PWD" node --input-type=module <<'NODE'
           import { chromium } from '@playwright/test';
           const browser = await chromium.launch();
           try {
@@ -408,7 +392,7 @@ jobs:
       # The `e2e` Playwright project: every flow in e2e/*.test.ts, the phone flows at iPhone 13 size.
       - name: Flows
         working-directory: studio
-        run: pnpm test:e2e
+        run: ../.github/nocobase3/run-studio-browser.sh "$PWD" pnpm test:e2e
 
       # The flows' traces and failure screenshots. The `screenshots` Playwright project (`pnpm test:screenshots`)
       # asserts nothing beyond page errors and is not run on pull requests; run it locally when a change needs it.
@@ -430,14 +414,8 @@ jobs:
     name: Framework build cache
     needs: e2e
     if: ${{ always() && inputs.event_name == 'pull_request' && needs.e2e.outputs.framework-key != '' && needs.e2e.outputs.framework-cached != 'true' }}
+    # Match the Noble browser container, including native modules built on the host.
     runs-on: ubuntu-24.04
-    container:
-      # Keep both build jobs on the same OS and update this with Studio's locked Playwright version.
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
-      options: --init --ipc=host
-    defaults:
-      run:
-        shell: bash
     permissions:
       contents: read
     timeout-minutes: 30
